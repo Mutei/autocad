@@ -4,26 +4,26 @@ import 'package:flutter/material.dart';
 import '../models/furniture_spot.dart';
 
 class ToolBar extends StatelessWidget {
-  final bool moveMode;
   final FurnitureType selectedType;
   final int selectedCapacity;
   final TableShape selectedShape;
-  final VoidCallback onMoveToggle;
+  final Color selectedColor;
   final ValueChanged<FurnitureType> onTypeSelected;
   final ValueChanged<int> onCapacitySelected;
   final ValueChanged<TableShape> onShapeSelected;
+  final VoidCallback onDefaultColorPick;
   final VoidCallback onClear;
 
   const ToolBar({
     super.key,
-    required this.moveMode,
     required this.selectedType,
     required this.selectedCapacity,
     required this.selectedShape,
-    required this.onMoveToggle,
+    required this.selectedColor,
     required this.onTypeSelected,
     required this.onCapacitySelected,
     required this.onShapeSelected,
+    required this.onDefaultColorPick,
     required this.onClear,
   });
 
@@ -36,30 +36,24 @@ class ToolBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _toolButton(
-            icon: Icons.open_with,
-            label: 'Move',
-            isSelected: moveMode,
-            onTap: onMoveToggle,
-          ),
-          _toolButton(
             icon: Icons.table_restaurant,
             label: 'Table',
-            isSelected: !moveMode && selectedType == FurnitureType.table,
+            isSelected: selectedType == FurnitureType.table,
             onTap: () => onTypeSelected(FurnitureType.table),
           ),
           _toolButton(
             icon: Icons.event_seat,
             label: 'Chair',
-            isSelected: !moveMode && selectedType == FurnitureType.chair,
+            isSelected: selectedType == FurnitureType.chair,
             onTap: () => onTypeSelected(FurnitureType.chair),
           ),
-          if (!moveMode && selectedType == FurnitureType.table) ...[
+          if (selectedType == FurnitureType.table) ...[
             PopupMenuButton<int>(
               icon: const Icon(Icons.format_list_numbered),
               tooltip: 'Seats',
               onSelected: onCapacitySelected,
               itemBuilder: (_) => [2, 4, 6, 8]
-                  .map((c) => PopupMenuItem(value: c, child: Text('$c seats')))
+                  .map((c) => PopupMenuItem(value: c, child: Text('$c')))
                   .toList(),
             ),
             PopupMenuButton<TableShape>(
@@ -80,17 +74,23 @@ class ToolBar extends StatelessWidget {
                     icon = Icons.rectangle;
                 }
                 return PopupMenuItem(
-                    value: shape,
-                    child: Row(
-                      children: [
-                        Icon(icon),
-                        const SizedBox(width: 8),
-                        Text(shape.name.capitalize())
-                      ],
-                    ));
+                  value: shape,
+                  child: Row(
+                    children: [
+                      Icon(icon),
+                      const SizedBox(width: 8),
+                      Text(shape.name.capitalize()),
+                    ],
+                  ),
+                );
               }).toList(),
             ),
           ],
+          IconButton(
+            icon: Icon(Icons.color_lens, color: selectedColor),
+            tooltip: 'Default Color',
+            onPressed: onDefaultColorPick,
+          ),
           IconButton(
             icon: const Icon(Icons.delete_forever),
             tooltip: 'Clear All',

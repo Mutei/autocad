@@ -17,13 +17,11 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
   final _spots = <FurnitureSpot>[];
   final uuid = const Uuid();
 
-  // interaction state
-  bool _moveMode = false;
   FurnitureType _selectedType = FurnitureType.table;
   int _defaultCapacity = 4;
   TableShape _selectedShape = TableShape.rectangle;
+  Color _selectedColor = Colors.brown;
 
-  // relative sizes for rectangle tables
   final _tableSizes = {
     2: const Size(0.2, 0.1),
     4: const Size(0.3, 0.15),
@@ -32,13 +30,12 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
   };
 
   void _addSpot(Offset pos, Size canvas) {
-    if (_moveMode) return;
     final x = (pos.dx / canvas.width).clamp(0.0, 1.0);
     final y = (pos.dy / canvas.height).clamp(0.0, 1.0);
 
+    double w, h;
     if (_selectedType == FurnitureType.table) {
       final base = _tableSizes[_defaultCapacity]!;
-      double w, h;
       switch (_selectedShape) {
         case TableShape.square:
           w = h = base.width;
@@ -51,48 +48,55 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
           w = base.width;
           h = base.height;
       }
-      _spots.add(FurnitureSpot(
-        id: uuid.v4().substring(0, 4),
-        x: x,
-        y: y,
-        w: w,
-        h: h,
-        type: FurnitureType.table,
-        capacity: _defaultCapacity,
-        shape: _selectedShape,
-      ));
     } else {
-      _spots.add(FurnitureSpot(
-        id: uuid.v4().substring(0, 4),
-        x: x,
-        y: y,
-        w: 0.05,
-        h: 0.05,
-        type: FurnitureType.chair,
-      ));
+      w = h = 0.05;
     }
+
+    _spots.add(FurnitureSpot(
+      id: uuid.v4().substring(0, 4),
+      x: x,
+      y: y,
+      w: w,
+      h: h,
+      type: _selectedType,
+      capacity: _selectedType == FurnitureType.table ? _defaultCapacity : 1,
+      shape: _selectedType == FurnitureType.table
+          ? _selectedShape
+          : TableShape.rectangle,
+      color: _selectedColor,
+    ));
+
     setState(() {});
   }
 
-  void _toggleMove() {
-    setState(() => _moveMode = !_moveMode);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_moveMode ? 'Move Mode' : 'Add Mode'),
-        duration: const Duration(milliseconds: 400),
+  Future<void> _pickDefaultColor() async {
+    final color = await showDialog<Color>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pick default color'),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: Colors.primaries.map((c) {
+              return GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(c),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: c,
+                    border: Border.all(color: Colors.black26),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
+    if (color != null) setState(() => _selectedColor = color);
   }
-
-  void _selectType(FurnitureType t) {
-    setState(() {
-      _selectedType = t;
-      _moveMode = false;
-    });
-  }
-
-  void _selectCapacity(int c) => setState(() => _defaultCapacity = c);
-  void _selectShape(TableShape s) => setState(() => _selectedShape = s);
 
   void _saveLayout() {
     debugPrint(_spots
@@ -105,6 +109,7 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
               'y': s.y,
               'w': s.w,
               'h': s.h,
+              'color': s.color.value,
             })
         .toString());
     ScaffoldMessenger.of(context).showSnackBar(
@@ -117,9 +122,7 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _moveMode
-              ? 'Move Mode'
-              : 'Add: ${_selectedType == FurnitureType.table ? '${_defaultCapacity}-seat ${_selectedShape.name.capitalize()} Table' : 'Chair'}',
+          'Add: ${_selectedType == FurnitureType.table ? '${_defaultCapacity}-seat ${_selectedShape.name.capitalize()} Table' : 'Chair'}',
         ),
         actions: [
           IconButton(
@@ -137,32 +140,51 @@ class _SeatMapBuilderScreenState extends State<SeatMapBuilderScreen> {
                 final canvas = Size(box.maxWidth, box.maxHeight);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTapDown: (d) => _addSpot(d.localPosition, canvas),
+                  onTapDown: (d) {
+                    final tapPos = d.localPosition;
+
+                    // don’t add if tapping an existing spot
+                    bool hitExisting = _spots.any((spot) {
+                      final center = Offset(
+                        spot.x * canvas.width,
+                        spot.y * canvas.height,
+                      );
+                      final halfW = spot.w * canvas.width / 2;
+                      final halfH = spot.h * canvas.height / 2;
+                      final rect = Rect.fromCenter(
+                          center: center, width: halfW * 2, height: halfH * 2);
+                      return rect.contains(tapPos);
+                    });
+
+                    if (!hitExisting) {
+                      _addSpot(tapPos, canvas);
+                    }
+                  },
                   child: Stack(
-                    children: _spots
-                        .map(
-                          (spot) => SpotWidget(
-                            spot: spot,
-                            canvasSize: canvas,
-                            allowDrag: _moveMode,
-                            onUpdate: () => setState(() {}),
-                          ),
-                        )
-                        .toList(),
+                    children: _spots.map((spot) {
+                      return SpotWidget(
+                        spot: spot,
+                        canvasSize: canvas,
+                        onUpdate: () => setState(() {}),
+                        onDelete: () {
+                          setState(() => _spots.remove(spot));
+                        },
+                      );
+                    }).toList(),
                   ),
                 );
               },
             ),
           ),
           ToolBar(
-            moveMode: _moveMode,
             selectedType: _selectedType,
             selectedCapacity: _defaultCapacity,
             selectedShape: _selectedShape,
-            onMoveToggle: _toggleMove,
-            onTypeSelected: _selectType,
-            onCapacitySelected: _selectCapacity,
-            onShapeSelected: _selectShape,
+            selectedColor: _selectedColor,
+            onTypeSelected: (t) => setState(() => _selectedType = t),
+            onCapacitySelected: (c) => setState(() => _defaultCapacity = c),
+            onShapeSelected: (s) => setState(() => _selectedShape = s),
+            onDefaultColorPick: _pickDefaultColor,
             onClear: () => setState(() => _spots.clear()),
           ),
         ],
