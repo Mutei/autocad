@@ -2,9 +2,17 @@
 
 import 'package:flutter/material.dart';
 
-enum FurnitureType { table, chair }
+/// What kind of spot this is.
+enum FurnitureType { table, seat, toilet, decoration }
 
+/// Shapes only for tables.
 enum TableShape { rectangle, square, circle }
+
+/// Chair vs. sofa styling.
+enum SeatType { chair, sofa }
+
+/// Decoration variants.
+enum DecorationType { door, window, view }
 
 class FurnitureSpot {
   final String id;
@@ -12,10 +20,24 @@ class FurnitureSpot {
   double y;
   double w; // normalized width
   double h; // normalized height
+
+  /// table, seat, toilet, or decoration
   FurnitureType type;
+
+  /// only for tables
   int capacity;
+
+  /// only for tables
   TableShape shape;
-  Color color; // <-- new
+
+  /// for seats and seats around tables
+  SeatType seatType;
+
+  /// only when type == decoration
+  DecorationType? decorationType;
+
+  /// tint/color
+  Color color;
 
   FurnitureSpot({
     required this.id,
@@ -26,6 +48,8 @@ class FurnitureSpot {
     required this.type,
     this.capacity = 1,
     this.shape = TableShape.rectangle,
-    this.color = const Color(0xFFB8860B), // default
+    this.seatType = SeatType.chair,
+    this.decorationType,
+    this.color = const Color(0xFFB8860B),
   });
 }

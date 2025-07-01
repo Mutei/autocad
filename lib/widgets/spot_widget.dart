@@ -2,6 +2,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../models/furniture_spot.dart';
 
 typedef VoidCallback = void Function();
@@ -13,12 +14,12 @@ class SpotWidget extends StatelessWidget {
   final VoidCallback onDelete;
 
   const SpotWidget({
-    super.key,
+    Key? key,
     required this.spot,
     required this.canvasSize,
     required this.onUpdate,
     required this.onDelete,
-  });
+  }) : super(key: key);
 
   Future<void> _pickColor(BuildContext context) async {
     final color = await showDialog<Color>(
@@ -75,17 +76,10 @@ class SpotWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tw = spot.w * canvasSize.width;
-    final th = spot.h * canvasSize.height;
-    final left = spot.x * canvasSize.width - tw / 2;
-    final top = spot.y * canvasSize.height - th / 2;
-
-    // center of table
-    final cx = left + tw / 2;
-    final cy = top + th / 2;
-    // chair size and spacing
-    const double cs = 28.0;
-    final double radius = math.max(tw, th) / 2 + cs / 2 + 8;
+    final double tw = spot.w * canvasSize.width;
+    final double th = spot.h * canvasSize.height;
+    final double left = spot.x * canvasSize.width - tw / 2;
+    final double top = spot.y * canvasSize.height - th / 2;
 
     final pan = (DragUpdateDetails d) {
       spot.x = (spot.x + d.delta.dx / canvasSize.width).clamp(0.0, 1.0);
@@ -93,77 +87,47 @@ class SpotWidget extends StatelessWidget {
       onUpdate();
     };
 
-    Widget tableOrChair;
-    if (spot.type == FurnitureType.chair) {
-      tableOrChair = DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [spot.color.withOpacity(0.7), spot.color],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(6),
-          boxShadow: const [
-            BoxShadow(
-                color: Colors.black26, blurRadius: 4, offset: Offset(2, 2))
-          ],
-        ),
-        child: Center(
-          child: Icon(
-            Icons.chair,
-            size: 20,
-            color: spot.color.computeLuminance() > 0.5
-                ? Colors.black
-                : Colors.white,
+    // Decoration (door, window, view)
+    if (spot.type == FurnitureType.decoration) {
+      IconData iconData;
+      switch (spot.decorationType!) {
+        case DecorationType.window:
+          iconData = MdiIcons.windowOpenVariant;
+          break;
+        case DecorationType.view:
+          iconData = MdiIcons.panorama;
+          break;
+        case DecorationType.door:
+        default:
+          iconData = MdiIcons.doorOpen;
+      }
+      return Positioned(
+        left: left,
+        top: top,
+        child: GestureDetector(
+          onPanUpdate: pan,
+          onTapDown: (d) => _showOptions(context, d),
+          child: Material(
+            elevation: 4,
+            shape: const CircleBorder(),
+            color: Colors.white,
+            shadowColor: Colors.black26,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(
+                iconData,
+                size: 32,
+                color: spot.color,
+              ),
+            ),
           ),
         ),
       );
-    } else {
-      final commonDeco = BoxDecoration(
-        gradient: LinearGradient(
-          colors: [spot.color.withOpacity(0.7), spot.color],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: const [
-          BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(3, 3))
-        ],
-      );
-      tableOrChair = spot.shape == TableShape.circle
-          ? DecoratedBox(
-              decoration: commonDeco.copyWith(shape: BoxShape.circle),
-              child: Center(
-                child: Text(
-                  '${spot.capacity} seats',
-                  style: TextStyle(
-                    color: spot.color.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            )
-          : DecoratedBox(
-              decoration:
-                  commonDeco.copyWith(borderRadius: BorderRadius.circular(12)),
-              child: Center(
-                child: Text(
-                  '${spot.capacity} seats',
-                  style: TextStyle(
-                    color: spot.color.computeLuminance() > 0.5
-                        ? Colors.black
-                        : Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            );
     }
 
-    return Stack(children: [
-      // the spot itself (table or chair)
-      Positioned(
+    // Toilet
+    if (spot.type == FurnitureType.toilet) {
+      return Positioned(
         left: left,
         top: top,
         width: tw,
@@ -171,41 +135,117 @@ class SpotWidget extends StatelessWidget {
         child: GestureDetector(
           onPanUpdate: pan,
           onTapDown: (d) => _showOptions(context, d),
-          child: tableOrChair,
+          child: Material(
+            elevation: 4,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            color: Colors.white,
+            shadowColor: Colors.black26,
+            child: Center(
+              child: Icon(
+                MdiIcons.toilet,
+                size: 28,
+                color: spot.color,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Standalone seat (chair or sofa)
+    if (spot.type == FurnitureType.seat) {
+      return Positioned(
+        left: left,
+        top: top,
+        width: tw,
+        height: th,
+        child: GestureDetector(
+          onPanUpdate: pan,
+          onTapDown: (d) => _showOptions(context, d),
+          child: Material(
+            elevation: 4,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            color: spot.color,
+            shadowColor: Colors.black26,
+            child: Center(
+              child: Icon(
+                spot.seatType == SeatType.chair
+                    ? Icons.event_seat
+                    : MdiIcons.sofa,
+                size: 24,
+                color: spot.color.computeLuminance() > 0.5
+                    ? Colors.black
+                    : Colors.white,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Table + seats around
+    final commonDeco = Material(
+      elevation: 4,
+      shape: spot.shape == TableShape.circle
+          ? const CircleBorder()
+          : RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: spot.color,
+      shadowColor: Colors.black26,
+      child: Center(
+        child: Text(
+          '${spot.capacity} seats',
+          style: TextStyle(
+            color: spot.color.computeLuminance() > 0.5
+                ? Colors.black
+                : Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
+    );
 
-      // if it's a table, draw chairs around it
-      if (spot.type == FurnitureType.table)
-        for (int i = 0; i < spot.capacity; i++)
-          Positioned(
-            left: cx +
-                radius * math.cos(2 * math.pi * i / spot.capacity) -
-                cs / 2,
-            top: cy +
-                radius * math.sin(2 * math.pi * i / spot.capacity) -
-                cs / 2,
-            width: cs,
-            height: cs,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [spot.color.withOpacity(0.7), spot.color],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: const [
-                  BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: Offset(2, 2))
-                ],
-              ),
+    final tablePos = Positioned(
+      left: left,
+      top: top,
+      width: tw,
+      height: th,
+      child: GestureDetector(
+        onPanUpdate: pan,
+        onTapDown: (d) => _showOptions(context, d),
+        child: commonDeco,
+      ),
+    );
+
+    const double cs = 36.0;
+    final double cx = left + tw / 2;
+    final double cy = top + th / 2;
+    final double radius = math.max(tw, th) / 2 + cs / 2 + 8;
+
+    final seats = [
+      for (int i = 0; i < spot.capacity; i++)
+        Positioned(
+          left:
+              cx + radius * math.cos(2 * math.pi * i / spot.capacity) - cs / 2,
+          top: cy + radius * math.sin(2 * math.pi * i / spot.capacity) - cs / 2,
+          width: cs,
+          height: cs,
+          child: GestureDetector(
+            onPanUpdate: pan,
+            onTapDown: (d) => _showOptions(context, d),
+            child: Material(
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              color: spot.color,
+              shadowColor: Colors.black26,
               child: Center(
                 child: Icon(
-                  Icons.chair,
-                  size: 20,
+                  spot.seatType == SeatType.chair
+                      ? MdiIcons.chairSchool
+                      : MdiIcons.sofa,
+                  size: 24,
                   color: spot.color.computeLuminance() > 0.5
                       ? Colors.black
                       : Colors.white,
@@ -213,6 +253,11 @@ class SpotWidget extends StatelessWidget {
               ),
             ),
           ),
-    ]);
+        ),
+    ];
+
+    return Stack(
+      children: [tablePos, ...seats],
+    );
   }
 }
